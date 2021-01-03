@@ -150,7 +150,7 @@ def extract_orders(input_file: str, stocks_dict: dict):
         # m.group(1) = symbol
         # m.group(2) = stop quote
         r_order = re.compile('.*"\s?([A-Z]{1,4})\s?!?".*"Stop quote\$([0-9,]+\.?[0-9]{2})')
-        r_stock = re.compile('.*"([A-Z]{1,4})\s?!?"')
+        r_stock = re.compile('.*"\s?([A-Z]{1,4})\s?!?"')
         # "", "12/19/2020 11:21 PM ET", "VVT-5919", "CMA-Edge 5F3-62P16", "Sell", " BA", "3", "Stop quote$208.00", "$0.00 / $0.00", "$214.06", "GTC Expires: 6/18/2021", "Open  "
         # "" ,"9/21/2020 1:53 AM ET" ,"VVT-6890" ,"CMA-Edge 5F3-62P16" ,"Sell" ," GOOG" ,"3" ,"Stop quote$1,691.00" ,"$0.00 / $0.00" ,"$1,751.88" ,"GTC Expires: 3/19/2021" ,"Open  "
         lines = f.readlines()
