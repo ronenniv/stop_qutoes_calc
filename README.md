@@ -1,6 +1,6 @@
-#Install
+# Install
 chmod 755 stocks_orders.sh
-#Usage
+# Usage
 usage: main.py [-h] -c COST FILE -o ORDER FILE [-csv {yes,no}] [-v {on,off}]
 
 Extract stock price and calculate stop quote price

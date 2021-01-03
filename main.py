@@ -29,8 +29,7 @@ def verbose_print(text: str):
     """
     print verbose text if verbose_flag_indicator is on
 
-    :param text:
-    :return:
+    :param text: text to print
     """
     if verbose_flag_indicator == VERBOSE_ARG_ON:
         print(text)
@@ -120,7 +119,7 @@ def extract_stocks(input_file: str) -> dict:
 
         for line in lines:
             # when stock is sold it places -- for unrealized gain and unit cost.
-            # need to replace with zeros for regex to handle it
+            # need to replace with zeros before regex handle it
             line = re.sub('-- --', '+$0.0 +0.0%', line)
             line = re.sub('--', '$0.0', line)
 
@@ -144,11 +143,12 @@ def extract_orders(input_file: str, stocks_dict: dict):
 
     :param input_file: name of the order file
     :param stocks_dict: dict to store the existing orders
-    :return: stocks_dict with updated existing orders
     """
     verbose_print(f'Processing {input_file=} for orders.')
 
     with open(input_file, 'r') as f:
+        # m.group(1) = symbol
+        # m.group(2) = stop quote
         r_order = re.compile('.*"\s?([A-Z]{1,4})\s?!?".*"Stop quote\$([0-9,]+\.?[0-9]{2})')
         r_stock = re.compile('.*"([A-Z]{1,4})\s?!?"')
         # "", "12/19/2020 11:21 PM ET", "VVT-5919", "CMA-Edge 5F3-62P16", "Sell", " BA", "3", "Stop quote$208.00", "$0.00 / $0.00", "$214.06", "GTC Expires: 6/18/2021", "Open  "
@@ -156,7 +156,7 @@ def extract_orders(input_file: str, stocks_dict: dict):
         lines = f.readlines()
 
         stock_counter = []  # for reconciliation
-        stock_handle = []
+        stock_handle = []  # for reconciliation
         for line in lines:
             if m := r_stock.match(line):
                 stock_counter.append(m.group(1))
@@ -169,6 +169,7 @@ def extract_orders(input_file: str, stocks_dict: dict):
                     stocks_dict[m.group(1)] = {}
                     stocks_dict[m.group(1)][STOCK_EXIST_STOP] = re.sub(',', '', m.group(2))
                 finally:
+                    # for reconciliation
                     stock_handle.append(m.group(1))
         if len(stock_counter) != len(stock_handle):
             print(f'Error ***\n{stock_counter=}\n{stock_handle=}\n*** not equal when parsing existing orders')
