@@ -263,11 +263,13 @@ def print_results(stocks_dict: dict, output_indicator: str):
     with open(output_file, 'x') if output_file else sys.stdout as f:
         f.write('Symbol,Gain,Last Price,Existing Stop Quote,New Stop Quote,Comments\n')
         for stock, stock_details in stocks_dict.items():
+            comments = ''
             try:
                 if float(stock_details[STOCK_EXIST_STOP]) > float(stock_details[STOCK_NEW_STOP]):
                     comments = 'New stop quote is lower than the existing!'
             except ValueError:
-                comments = ''
+                # when stock exist stop not exist
+                pass
             f.write(stock + ',' + stock_details[STOCK_GAIN] + ',' + stock_details[STOCK_LAST_PRICE] + ',' +
                     stock_details[STOCK_EXIST_STOP] + ',' + stock_details[STOCK_NEW_STOP] + ',' + comments + '\n')
 
