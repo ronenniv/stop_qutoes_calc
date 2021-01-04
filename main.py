@@ -27,17 +27,24 @@ PERCENT_FOR_STOP_QUOTE = 0.95
 STOCK_HOLDING_QUANTITY = 'HOLDING_QUANTITY'
 STOCK_ORDER_QUANTITY = 'ORDER_QUANTITY'
 
-verbose_flag_indicator = VERBOSE_ARG_OFF  # pylint: disable=C0103
 
+class Verbose:
+    _indicator_flag = VERBOSE_ARG_OFF
 
-def verbose_print(text: str):
-    """
-    print verbose text if verbose_flag_indicator is on
+    @classmethod
+    def set_indicator(cls, indicator_status: str):
+        cls._indicator_flag = indicator_status
 
-    :param text: text to print
-    """
-    if verbose_flag_indicator == VERBOSE_ARG_ON:
-        print(text)
+    @classmethod
+    def print(cls, text: str):
+        """
+        print text if verbose flag is on
+
+        :param text:
+        :return:
+        """
+        if cls._indicator_flag == VERBOSE_ARG_ON:
+            print(text)
 
 
 def get_input_file_argparse() -> dict:
@@ -78,19 +85,17 @@ def get_input_file_argparse() -> dict:
     # when option is default, argparse return params as str, and if it get arg in command line,
     # it return it as list
     if isinstance(args.verbose, list):
-        files_dict[VERBOSE_FLAG] = args.verbose[0]
+        Verbose.set_indicator(args.verbose[0])
     else:
-        files_dict[VERBOSE_FLAG] = args.verbose
-    global verbose_flag_indicator  # pylint: disable=C0103
-    verbose_flag_indicator = files_dict[VERBOSE_FLAG]
-    verbose_print('Verbose is ON')
+        Verbose.set_indicator(args.verbose)
+    Verbose.print('Verbose is ON')
 
     if isinstance(args.csv, list):
         files_dict[OUTPUT_FLAG] = args.csv[0]
     else:
         files_dict[OUTPUT_FLAG] = args.csv
 
-    verbose_print(f'Arguments to be used:\n{files_dict}')
+    Verbose.print(f'Arguments to be used:\n{files_dict}')
     return files_dict
 
 
@@ -117,7 +122,7 @@ def extract_stocks(input_file_name: str) -> dict:
     :param input_file_name: str
     :return: dict with symbol as key, and unit cost as value
     """
-    verbose_print(f'Processing {input_file_name=} for holdings.')
+    Verbose.print(f'Processing {input_file_name=} for holdings.')
 
     with open(input_file_name, 'r') as file_output_stream:
         # group(1) = Symbol
@@ -163,7 +168,7 @@ def extract_orders(input_file_name: str, stocks_dict: dict):
     :param input_file_name: name of the order file
     :param stocks_dict: dict to store the existing orders
     """
-    verbose_print(f'Processing {input_file_name=} for orders.')
+    Verbose.print(f'Processing {input_file_name=} for orders.')
 
     with open(input_file_name, 'r') as file_output_stream:
         # m.group(1) = symbol
@@ -192,9 +197,8 @@ def extract_orders(input_file_name: str, stocks_dict: dict):
                   f'*** not equal when parsing existing orders')
             sys.exit(1)
 
-        if verbose_flag_indicator == VERBOSE_ARG_ON:
-            for stock, value in stocks_dict.items():
-                print(f'{stock=} {value=}')
+        for stock, value in stocks_dict.items():
+            Verbose.print(f'{stock=} {value=}')
 
 
 def calc_95stop_quote(stocks_dict: dict) -> dict:
@@ -221,7 +225,7 @@ def calc_avg_quote(stocks_dict: dict) -> dict:
     :param stocks_dict:
     :return: dict with calculated new stop quote price
     """
-    verbose_print('Calculating stop quotes.')
+    Verbose.print('Calculating stop quotes.')
 
     for stock, stock_details in stocks_dict.items():
         if stock_details[STOCK_GAIN] >= 5 or \
@@ -243,14 +247,13 @@ def calc_avg_quote(stocks_dict: dict) -> dict:
                 avg_stop_quote = int(stock_95stop_quote)
             stocks_dict[stock][STOCK_NEW_STOP] = avg_stop_quote
         else:
-            verbose_print(f'No calculation for stock {stock} '
+            Verbose.print(f'No calculation for stock {stock} '
                           f'with gain {stock_details[STOCK_GAIN]}% '
                           f'and existing stop quote of {stock_details[STOCK_EXIST_STOP]}$')
             stocks_dict[stock][STOCK_NEW_STOP] = ''
 
-    if verbose_flag_indicator == VERBOSE_ARG_ON:
-        for stock, value in stocks_dict.items():
-            print(f'{stock=} {value=}')
+    for stock, value in stocks_dict.items():
+        Verbose.print(f'{stock=} {value=}')
 
     return stocks_dict
 
@@ -286,7 +289,7 @@ def print_results(stocks_dict: dict, output_indicator: str):
         output_file_name = os.path.join(os.path.expanduser('~/Downloads'), output_file_name)
     else:
         output_file_name = None
-    verbose_print(f'Writing output to {output_file_name}')
+    Verbose.print(f'Writing output to {output_file_name}')
     with open(output_file_name, 'x') if output_file_name else sys.stdout as file_output_stream:
         file_output_stream.write('Symbol,Gain,Last Price,Existing Stop Quote,New Stop Quote,'
                                  'Comments\n')
