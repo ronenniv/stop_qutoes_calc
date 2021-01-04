@@ -1,3 +1,6 @@
+"""
+calculate stop quotes for BOFA orders
+"""
 import argparse
 import os
 import re
@@ -43,21 +46,37 @@ def get_input_file_argparse() -> dict:
 
     :return: the input file name/s, verbose flag
     """
-    parser = argparse.ArgumentParser(description='Extract stock price and calculate stop quote price')
-    parser.add_argument('-c', '--cost_file', metavar='COST FILE', required=True, help='file name/s with unit cost',
+    parser = argparse.ArgumentParser(description='Extract stock price and calculate stop quote '
+                                                 'price')
+    parser.add_argument('-c', '--cost_file',
+                        metavar='COST FILE',
+                        required=True,
+                        help='file name/s with unit cost',
                         nargs='+')
-    parser.add_argument('-o', '--order_file', metavar='ORDER FILE', required=True, help='file name/s with order status',
+    parser.add_argument('-o', '--order_file',
+                        metavar='ORDER FILE',
+                        required=True,
+                        help='file name/s with order status',
                         nargs='+')
-    parser.add_argument('-csv', choices=[OUTPUT_ARG_YES, OUTPUT_ARG_NO], nargs=1,
-                        required=False, default='no', help='send output to csv file <date,time>.summary.csv')
-    parser.add_argument('-v', '--verbose', choices=[VERBOSE_ARG_ON, VERBOSE_ARG_OFF], nargs=1,
-                        required=False, default=VERBOSE_ARG_OFF, help='verbose')
+    parser.add_argument('-csv',
+                        choices=[OUTPUT_ARG_YES, OUTPUT_ARG_NO],
+                        nargs=1,
+                        required=False,
+                        default='no',
+                        help='send output to csv file <date,time>.summary.csv')
+    parser.add_argument('-v', '--verbose',
+                        choices=[VERBOSE_ARG_ON, VERBOSE_ARG_OFF],
+                        nargs=1,
+                        required=False,
+                        default=VERBOSE_ARG_OFF,
+                        help='verbose indicator')
     args = parser.parse_args()
     files_dict = dict()
     files_dict[COST_FILE] = args.cost_file
     files_dict[ORDER_FILE] = args.order_file
     files_dict[OUTPUT_FLAG] = args.csv
-    # when default, argparse return params as str, and if it get arg in command line, it return it as list
+    # when option is default, argparse return params as str, and if it get arg in command line,
+    # it return it as list
     if isinstance(args.verbose, list):
         files_dict[VERBOSE_FLAG] = args.verbose[0]
     else:
@@ -105,8 +124,9 @@ def extract_stocks(input_file_name: str) -> dict:
         # group(2) = Unrealized gain
         # group(3) = Quantity
         # group(4) = Price
-        r_unit_cost = re.compile(r'"([A-Z]{1,4})\s?!?".."[+-]?\$\d+\.?\d\d [+-]?\d+\.?\d\d%".."[+-]?\$[0-9,]+\.?\d* ('
-                                 r'[+-]?\d+\.?\d*)%".."[A-Z].*".."(\d*.?\d*)".."\$[0-9,]+\.?\d*".."\$([0-9,]+\.?\d*)"')
+        r_unit_cost = re.compile(r'"([A-Z]{1,4})\s?!?".."[+-]?\$\d+\.?\d\d [+-]?\d+\.?\d\d%".."'
+                                 r'[+-]?\$[0-9,]+\.?\d* ([+-]?\d+\.?\d*)%".."[A-Z].*".."(\d*.?\d*)"'
+                                 r'.."\$[0-9,]+\.?\d*".."\$([0-9,]+\.?\d*)"')
         r_stock = re.compile(r'"([A-Z]{1,4})\s?!?"')
 
         lines = file_output_stream.readlines()
@@ -128,7 +148,8 @@ def extract_stocks(input_file_name: str) -> dict:
                 stocks_dict[m_order.group(1)] = stock_details
 
         if len(stocks_dict) != len(stock_counter):
-            print(f'Error ***\n{stock_counter=}\n{stocks_dict.keys()=}\n*** not equal when parsing holdings')
+            print(f'Error ***\n{stock_counter=}\n{stocks_dict.keys()=}\n'
+                  f'*** not equal when parsing holdings')
             print(f'Difference is {set(stock_counter).difference(set(stocks_dict.keys()))}')
             sys.exit(1)
 
@@ -148,7 +169,8 @@ def extract_orders(input_file_name: str, stocks_dict: dict):
         # m.group(1) = symbol
         # m.group(2) = quantity
         # m.group(3) = stop quote
-        r_order = re.compile(r'.*"\s?([A-Z]{1,4})\s?!?".*"(\d*.?\d*)".."Stop quote\$([0-9,]+\.?[0-9]{2})')
+        r_order = re.compile(r'.*"\s?([A-Z]{1,4})\s?!?".*"(\d*.?\d*)"..'
+                             r'"Stop quote\$([0-9,]+\.?[0-9]{2})')
         r_stock = re.compile(r'.*"\s?([A-Z]{1,4})\s?!?"')
 
         lines = file_output_stream.readlines()
@@ -166,7 +188,8 @@ def extract_orders(input_file_name: str, stocks_dict: dict):
                 # for reconciliation
                 stock_handle.append(m_order.group(1))
         if len(stock_counter) != len(stock_handle):
-            print(f'Error ***\n{stock_counter=}\n{stock_handle=}\n*** not equal when parsing existing orders')
+            print(f'Error ***\n{stock_counter=}\n{stock_handle=}\n'
+                  f'*** not equal when parsing existing orders')
             sys.exit(1)
 
         if verbose_flag_indicator == VERBOSE_ARG_ON:
@@ -191,9 +214,9 @@ def calc_95stop_quote(stocks_dict: dict) -> dict:
 
 def calc_avg_quote(stocks_dict: dict) -> dict:
     """
-    if no exist_stop, then stop_quote is round down of 95%
-    if exist stop, then average of 95% and existing stop
-    if stop quote is higher than 1000, round to int. if stop quote is higher than 50, round to one precision
+    if no exist_stop, then stop_quote is round down of 95% if exist stop, then average of 95% and
+    existing stop if stop quote is higher than 1000, round to int. if stop quote is higher than
+    50, round to one precision
 
     :param stocks_dict:
     :return: dict with calculated new stop quote price
@@ -220,8 +243,9 @@ def calc_avg_quote(stocks_dict: dict) -> dict:
                 avg_stop_quote = int(stock_95stop_quote)
             stocks_dict[stock][STOCK_NEW_STOP] = avg_stop_quote
         else:
-            verbose_print(f'No calculation for stock {stock} with gain {stock_details[STOCK_GAIN]}% and existing stop '
-                          f'quote of {stock_details[STOCK_EXIST_STOP]}$')
+            verbose_print(f'No calculation for stock {stock} '
+                          f'with gain {stock_details[STOCK_GAIN]}% '
+                          f'and existing stop quote of {stock_details[STOCK_EXIST_STOP]}$')
             stocks_dict[stock][STOCK_NEW_STOP] = ''
 
     if verbose_flag_indicator == VERBOSE_ARG_ON:
@@ -264,7 +288,8 @@ def print_results(stocks_dict: dict, output_indicator: str):
         output_file_name = None
     verbose_print(f'Writing output to {output_file_name}')
     with open(output_file_name, 'x') if output_file_name else sys.stdout as file_output_stream:
-        file_output_stream.write('Symbol,Gain,Last Price,Existing Stop Quote,New Stop Quote,Comments\n')
+        file_output_stream.write('Symbol,Gain,Last Price,Existing Stop Quote,New Stop Quote,'
+                                 'Comments\n')
         for stock, stock_details in stocks_dict.items():
             comments = ''
             try:
@@ -275,8 +300,12 @@ def print_results(stocks_dict: dict, output_indicator: str):
             except ValueError:
                 # when stock exist stop not exist
                 pass
-            file_output_stream.write(f'{stock},{stock_details[STOCK_GAIN]},{stock_details[STOCK_LAST_PRICE]},'
-                                     f'{stock_details[STOCK_EXIST_STOP]},{stock_details[STOCK_NEW_STOP]},{comments}\n')
+            file_output_stream.write(f'{stock},'
+                                     f'{stock_details[STOCK_GAIN]},'
+                                     f'{stock_details[STOCK_LAST_PRICE]},'
+                                     f'{stock_details[STOCK_EXIST_STOP]},'
+                                     f'{stock_details[STOCK_NEW_STOP]},'
+                                     f'{comments}\n')
 
 
 def main():
