@@ -10,7 +10,7 @@ from datetime import datetime
 # args constants
 COST_FILE = 'cost_file'
 ORDER_FILE = 'order_file'
-OUTPUT_FLAG = 'output'
+OUTPUT_FLAG = 'csv_file'
 VERBOSE_FLAG = 'verbose'
 OUTPUT_ARG_YES = 'yes'
 OUTPUT_ARG_NO = 'no'
@@ -86,7 +86,12 @@ def get_input_file_argparse() -> dict:
                         help='verbose indicator')
     args = parser.parse_args()
     files_dict = dict()
+    if args.cost_file == args.order_file:
+        print(f'Error: holding file {args.cost_file} same as order file {args.order_file}')
+        sys.exit(1)
+    verify_input_file(args.cost_file)
     files_dict[COST_FILE] = args.cost_file
+    verify_input_file(args.order_file)
     files_dict[ORDER_FILE] = args.order_file
     files_dict[OUTPUT_FLAG] = args.csv
     # when option is default, argparse return params as str, and if it get arg in command line,
@@ -305,11 +310,15 @@ def print_results(stocks_dict: dict, output_indicator: str):
             try:
                 if float(stock_details[STOCK_EXIST_STOP]) > float(stock_details[STOCK_NEW_STOP]):
                     comments = 'New stop quote is lower than the existing! '
-                if stock_details[STOCK_HOLDING_QUANTITY] != stock_details[STOCK_ORDER_QUANTITY]:
-                    comments += 'Holding quantity is different than Order quantity! '
             except ValueError:
                 # when stock exist stop not exist
                 pass
+            else:
+                # holding quantity can have fractions of a stock
+                # consider it when comparing holding and order quantity
+                if int(stock_details[STOCK_HOLDING_QUANTITY]) != \
+                        stock_details[STOCK_ORDER_QUANTITY]:
+                    comments += 'Holding quantity is different than Order quantity! '
             file_output_stream.write(f'{stock},'
                                      f'{stock_details[STOCK_GAIN]},'
                                      f'{stock_details[STOCK_LAST_PRICE]},'
@@ -323,8 +332,6 @@ def main():
     main function to execute parsing and calculation
     """
     files_dict = get_input_file_argparse()
-    verify_input_file(files_dict[COST_FILE])
-    verify_input_file(files_dict[ORDER_FILE])
     stocks_dict = extract_stocks(files_dict[COST_FILE][0])
     extract_orders(files_dict[ORDER_FILE][0], stocks_dict)
     calc_quotes(stocks_dict)
