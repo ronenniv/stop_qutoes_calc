@@ -4,6 +4,11 @@ clear
 echo "Running main.py"
 
 python3 main.py $@
+result=$?
 
-# shellcheck disable=SC2181
-[ $? -eq 0 ] && echo "Completed successfully" || echo "Completed with errors"
+if [ $result -eq 0 ]
+then
+  echo "Completed successfully"
+else
+  echo "Completed with errors"
+fi
