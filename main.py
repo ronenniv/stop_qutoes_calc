@@ -91,32 +91,25 @@ def verify_input_file(input_file: list):
                 sys.exit(1)
 
 
-def extract_stocks(input_file: str) -> dict:
+def extract_stocks(input_file_name: str) -> dict:
     """
     extract stock symbol and unit cost from holding csv file
 
-    :param input_file: str
+    :param input_file_name: str
     :return: dict with symbol as key, and unit cost as value
     """
-    verbose_print(f'Processing {input_file=} for holdings.')
+    verbose_print(f'Processing {input_file_name=} for holdings.')
 
-    with open(input_file, 'r') as f:
+    with open(input_file_name, 'r') as file_output_stream:
         # group(1) = Symbol
         # group(2) = Unrealized gain
         # group(3) = Quantity
         # group(4) = Price
-        r_unit_cost = re.compile(
-            '"([A-Z]{1,4})\s?!?".."[+-]?\$\d+\.?\d\d [+-]?\d+\.?\d\d%".."[+-]?\$[0-9,]+\.?\d* ([+-]?\d+\.?\d*)%".."[A-Z].*".."(\d*.?\d*)".."\$[0-9,]+\.?\d*".."\$([0-9,]+\.?\d*)"')
-        r_stock = re.compile('"([A-Z]{1,4})\s?!?"')
-        # "AAL !" ,"$0.00 0.00%" ,"+$0.0 +0.0%" ,"AMERICAN AIRLS GROUP INC" ,"0" ,"+$0.0" ,"$15.77" ,"$0.00" ,"$0.00"
-        # "QQQ !", "$0.00 0.00%", "+$2,399.39 +7.33%", "INVESCO QQQ TR    SER 1", "112", "$292.32", "$313.74", "$35,138.88", "$0.00"
-        # "FFTY !" ,"$0.00 0.00%" ,"$0.00 0.00%" ,"INNOVATOR ETFS TR  IBD" ,"25" ,"$41.05" ,"$41.05" ,"$1,026.25" ,"$0.00"
-        # "ESPO !", "$0.00 0.00%", "+$27.13 +6.90%", "VANECK VECTORS VIDEO", "6", "$65.49", "$70.01", "$420.06", "$0.00"
-        # "TMUS" ,"$0.00 0.00%" ,"+$10.15 +3.91%" ,"T-MOBILE US INC SHS" ,"2" ,"$129.78" ,"$134.85" ,"$269.70" ,"$0.00"
-        # "ORCL !" ,"$0.00 0.00%" ,"+$67.50 +4.98%" ,"ORACLE CORP $0.01    DEL" ,"22" ,"$61.62" ,"$64.69" ,"$1,423.18" ,"$0.00"
-        # "GOOG", "+$12.36 +0.71%", "-$57.54 -3.18%", "ALPHABET INC SHS    CL C", "1", "$1,809.42", "$1,751.88", "$1,751.88", "+$12.36"
+        r_unit_cost = re.compile(r'"([A-Z]{1,4})\s?!?".."[+-]?\$\d+\.?\d\d [+-]?\d+\.?\d\d%".."[+-]?\$[0-9,]+\.?\d* ('
+                                 r'[+-]?\d+\.?\d*)%".."[A-Z].*".."(\d*.?\d*)".."\$[0-9,]+\.?\d*".."\$([0-9,]+\.?\d*)"')
+        r_stock = re.compile(r'"([A-Z]{1,4})\s?!?"')
 
-        lines = f.readlines()
+        lines = file_output_stream.readlines()
         stocks_dict = {}
         stock_counter = []  # use for reconciliation
 
@@ -126,11 +119,13 @@ def extract_stocks(input_file: str) -> dict:
             line = re.sub('-- --', '+$0.0 +0.0%', line)
             line = re.sub('--', '$0.0', line)
 
-            if m := r_stock.match(line):
-                stock_counter.append(m.group(1))
-            if m := r_unit_cost.match(line):
-                stock_details = {STOCK_GAIN: float(m.group(2)), STOCK_LAST_PRICE: float(re.sub(',', '', m.group(4))), STOCK_HOLDING_QUANTITY: float(m.group(3))}
-                stocks_dict[m.group(1)] = stock_details
+            if m_stock := r_stock.match(line):
+                stock_counter.append(m_stock.group(1))
+            if m_order := r_unit_cost.match(line):
+                stock_details = {STOCK_GAIN: float(m_order.group(2)),
+                                 STOCK_LAST_PRICE: float(re.sub(',', '', m_order.group(4))),
+                                 STOCK_HOLDING_QUANTITY: float(m_order.group(3))}
+                stocks_dict[m_order.group(1)] = stock_details
 
         if len(stocks_dict) != len(stock_counter):
             print(f'Error ***\n{stock_counter=}\n{stocks_dict.keys()=}\n*** not equal when parsing holdings')
@@ -140,37 +135,36 @@ def extract_stocks(input_file: str) -> dict:
         return stocks_dict
 
 
-def extract_orders(input_file: str, stocks_dict: dict):
+def extract_orders(input_file_name: str, stocks_dict: dict):
     """
     extract existing orders from open orders csv file and update stocks_dict
 
-    :param input_file: name of the order file
+    :param input_file_name: name of the order file
     :param stocks_dict: dict to store the existing orders
     """
-    verbose_print(f'Processing {input_file=} for orders.')
+    verbose_print(f'Processing {input_file_name=} for orders.')
 
-    with open(input_file, 'r') as f:
+    with open(input_file_name, 'r') as file_output_stream:
         # m.group(1) = symbol
         # m.group(2) = quantity
         # m.group(3) = stop quote
-        r_order = re.compile('.*"\s?([A-Z]{1,4})\s?!?".*"(\d*.?\d*)".."Stop quote\$([0-9,]+\.?[0-9]{2})')
-        r_stock = re.compile('.*"\s?([A-Z]{1,4})\s?!?"')
-        # "", "12/19/2020 11:21 PM ET", "VVT-5919", "CMA-Edge 5F3-62P16", "Sell", " BA", "3", "Stop quote$208.00", "$0.00 / $0.00", "$214.06", "GTC Expires: 6/18/2021", "Open  "
-        # "" ,"9/21/2020 1:53 AM ET" ,"VVT-6890" ,"CMA-Edge 5F3-62P16" ,"Sell" ," GOOG" ,"3" ,"Stop quote$1,691.00" ,"$0.00 / $0.00" ,"$1,751.88" ,"GTC Expires: 3/19/2021" ,"Open  "
-        lines = f.readlines()
+        r_order = re.compile(r'.*"\s?([A-Z]{1,4})\s?!?".*"(\d*.?\d*)".."Stop quote\$([0-9,]+\.?[0-9]{2})')
+        r_stock = re.compile(r'.*"\s?([A-Z]{1,4})\s?!?"')
+
+        lines = file_output_stream.readlines()
 
         stock_counter = []  # for reconciliation
         stock_handle = []  # for reconciliation
         for line in lines:
-            if m := r_stock.match(line):
-                stock_counter.append(m.group(1))
-            if m := r_order.match(line):
-                stock_details = stocks_dict[m.group(1)]
-                stock_details[STOCK_EXIST_STOP] = float(re.sub(',', '', m.group(3)))
-                stock_details[STOCK_ORDER_QUANTITY] = float(m.group(2))
-                stocks_dict[m.group(1)] = stock_details
+            if m_stock := r_stock.match(line):
+                stock_counter.append(m_stock.group(1))
+            if m_order := r_order.match(line):
+                stock_details = stocks_dict[m_order.group(1)]
+                stock_details[STOCK_EXIST_STOP] = float(re.sub(',', '', m_order.group(3)))
+                stock_details[STOCK_ORDER_QUANTITY] = float(m_order.group(2))
+                stocks_dict[m_order.group(1)] = stock_details
                 # for reconciliation
-                stock_handle.append(m.group(1))
+                stock_handle.append(m_order.group(1))
         if len(stock_counter) != len(stock_handle):
             print(f'Error ***\n{stock_counter=}\n{stock_handle=}\n*** not equal when parsing existing orders')
             sys.exit(1)
@@ -204,7 +198,7 @@ def calc_avg_quote(stocks_dict: dict) -> dict:
     :param stocks_dict:
     :return: dict with calculated new stop quote price
     """
-    verbose_print(f'Calculating stop quotes.')
+    verbose_print('Calculating stop quotes.')
 
     for stock, stock_details in stocks_dict.items():
         if stock_details[STOCK_GAIN] >= 5 or \
@@ -245,7 +239,7 @@ def calc_quotes(stocks_dict: dict):
     :return:
     """
     # fill empty exist stop quote for stocks without existing stop quotes
-    for stock, stock_details in stocks_dict.items():
+    for _, stock_details in stocks_dict.items():
         try:
             _ = stock_details[STOCK_EXIST_STOP]
         except KeyError:
@@ -256,14 +250,21 @@ def calc_quotes(stocks_dict: dict):
 
 
 def print_results(stocks_dict: dict, output_indicator: str):
+    """
+    print calculation results to file or stdout
+
+    :param stocks_dict:
+    :param output_indicator: OUTPUT_ARG_YES will send output to csv file
+    :return:
+    """
     if output_indicator == OUTPUT_ARG_YES:
-        datetime.now().strftime('%m%d%Y_%H%M%S')
-        output_file = os.path.join(os.path.expanduser('~/Downloads'), datetime.now().strftime('%m%d%Y_%H%M%S') + '.summary.csv')
+        output_file_name = datetime.now().strftime('%m%d%Y_%H%M%S') + '.summary.csv'
+        output_file_name = os.path.join(os.path.expanduser('~/Downloads'), output_file_name)
     else:
-        output_file = None
-    verbose_print(f'Writing output to {output_file}')
-    with open(output_file, 'x') if output_file else sys.stdout as f:
-        f.write('Symbol,Gain,Last Price,Existing Stop Quote,New Stop Quote,Comments\n')
+        output_file_name = None
+    verbose_print(f'Writing output to {output_file_name}')
+    with open(output_file_name, 'x') if output_file_name else sys.stdout as file_output_stream:
+        file_output_stream.write('Symbol,Gain,Last Price,Existing Stop Quote,New Stop Quote,Comments\n')
         for stock, stock_details in stocks_dict.items():
             comments = ''
             try:
@@ -274,10 +275,14 @@ def print_results(stocks_dict: dict, output_indicator: str):
             except ValueError:
                 # when stock exist stop not exist
                 pass
-            f.write(f'{stock},{stock_details[STOCK_GAIN]},{stock_details[STOCK_LAST_PRICE]},{stock_details[STOCK_EXIST_STOP]},{stock_details[STOCK_NEW_STOP]},{comments}\n')
+            file_output_stream.write(f'{stock},{stock_details[STOCK_GAIN]},{stock_details[STOCK_LAST_PRICE]},'
+                                     f'{stock_details[STOCK_EXIST_STOP]},{stock_details[STOCK_NEW_STOP]},{comments}\n')
 
 
 def main():
+    """
+    main function to execute parsing and calculation
+    """
     files_dict = get_input_file_argparse()
     verify_input_file(files_dict[COST_FILE])
     verify_input_file(files_dict[ORDER_FILE])
