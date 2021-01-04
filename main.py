@@ -29,10 +29,18 @@ STOCK_ORDER_QUANTITY = 'ORDER_QUANTITY'
 
 
 class Verbose:
+    """
+    handle verbose status and print messages
+    """
     _indicator_flag = VERBOSE_ARG_OFF
 
     @classmethod
     def set_indicator(cls, indicator_status: str):
+        """
+        set verbose indicator (on/off)
+
+        :param indicator_status: VERBOSE_ARG_OFF/VERBOSE_ARG_ON
+        """
         cls._indicator_flag = indicator_status
 
     @classmethod
@@ -41,7 +49,6 @@ class Verbose:
         print text if verbose flag is on
 
         :param text:
-        :return:
         """
         if cls._indicator_flag == VERBOSE_ARG_ON:
             print(text)
