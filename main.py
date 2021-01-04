@@ -21,6 +21,8 @@ STOCK_95STOP_QUOTE = '95%STOP_QUOTE$'
 STOCK_EXIST_STOP = 'EXIST_STOP$'
 STOCK_NEW_STOP = 'NEW_STOP$'
 PERCENT_FOR_STOP_QUOTE = 0.95
+STOCK_HOLDING_QUANTITY = 'HOLDING_QUANTITY'
+STOCK_ORDER_QUANTITY = 'ORDER_QUANTITY'
 
 verbose_flag_indicator = VERBOSE_ARG_OFF  # default is verbose off
 
@@ -101,9 +103,10 @@ def extract_stocks(input_file: str) -> dict:
     with open(input_file, 'r') as f:
         # group(1) = Symbol
         # group(2) = Unrealized gain
-        # group(3) = Price
+        # group(3) = Quantity
+        # group(4) = Price
         r_unit_cost = re.compile(
-            '"([A-Z]{1,4})\s?!?".."[+-]?\$\d+\.?\d\d [+-]?\d+\.?\d\d%".."[+-]?\$[0-9,]+\.?\d* ([+-]?\d+\.?\d*)%".."[A-Z].*".."\d*.?\d*".."\$[0-9,]+\.?\d*".."\$([0-9,]+\.?\d*)"')
+            '"([A-Z]{1,4})\s?!?".."[+-]?\$\d+\.?\d\d [+-]?\d+\.?\d\d%".."[+-]?\$[0-9,]+\.?\d* ([+-]?\d+\.?\d*)%".."[A-Z].*".."(\d*.?\d*)".."\$[0-9,]+\.?\d*".."\$([0-9,]+\.?\d*)"')
         r_stock = re.compile('"([A-Z]{1,4})\s?!?"')
         # "AAL !" ,"$0.00 0.00%" ,"+$0.0 +0.0%" ,"AMERICAN AIRLS GROUP INC" ,"0" ,"+$0.0" ,"$15.77" ,"$0.00" ,"$0.00"
         # "QQQ !", "$0.00 0.00%", "+$2,399.39 +7.33%", "INVESCO QQQ TR    SER 1", "112", "$292.32", "$313.74", "$35,138.88", "$0.00"
@@ -126,7 +129,7 @@ def extract_stocks(input_file: str) -> dict:
             if m := r_stock.match(line):
                 stock_counter.append(m.group(1))
             if m := r_unit_cost.match(line):
-                stock_details = {STOCK_GAIN: m.group(2), STOCK_LAST_PRICE: re.sub(',', '', m.group(3))}
+                stock_details = {STOCK_GAIN: float(m.group(2)), STOCK_LAST_PRICE: float(re.sub(',', '', m.group(4))), STOCK_HOLDING_QUANTITY: float(m.group(3))}
                 stocks_dict[m.group(1)] = stock_details
 
         if len(stocks_dict) != len(stock_counter):
@@ -148,8 +151,9 @@ def extract_orders(input_file: str, stocks_dict: dict):
 
     with open(input_file, 'r') as f:
         # m.group(1) = symbol
-        # m.group(2) = stop quote
-        r_order = re.compile('.*"\s?([A-Z]{1,4})\s?!?".*"Stop quote\$([0-9,]+\.?[0-9]{2})')
+        # m.group(2) = quantity
+        # m.group(3) = stop quote
+        r_order = re.compile('.*"\s?([A-Z]{1,4})\s?!?".*"(\d*.?\d*)".."Stop quote\$([0-9,]+\.?[0-9]{2})')
         r_stock = re.compile('.*"\s?([A-Z]{1,4})\s?!?"')
         # "", "12/19/2020 11:21 PM ET", "VVT-5919", "CMA-Edge 5F3-62P16", "Sell", " BA", "3", "Stop quote$208.00", "$0.00 / $0.00", "$214.06", "GTC Expires: 6/18/2021", "Open  "
         # "" ,"9/21/2020 1:53 AM ET" ,"VVT-6890" ,"CMA-Edge 5F3-62P16" ,"Sell" ," GOOG" ,"3" ,"Stop quote$1,691.00" ,"$0.00 / $0.00" ,"$1,751.88" ,"GTC Expires: 3/19/2021" ,"Open  "
@@ -161,16 +165,12 @@ def extract_orders(input_file: str, stocks_dict: dict):
             if m := r_stock.match(line):
                 stock_counter.append(m.group(1))
             if m := r_order.match(line):
-                try:
-                    stocks_dict[m.group(1)][STOCK_EXIST_STOP] = re.sub(',', '', m.group(2))
-                except KeyError:
-                    if verbose_flag_indicator == VERBOSE_ARG_ON:
-                        print(f'{m.group(1)}: No entry for cost. Adding entry for order.')
-                    stocks_dict[m.group(1)] = {}
-                    stocks_dict[m.group(1)][STOCK_EXIST_STOP] = re.sub(',', '', m.group(2))
-                finally:
-                    # for reconciliation
-                    stock_handle.append(m.group(1))
+                stock_details = stocks_dict[m.group(1)]
+                stock_details[STOCK_EXIST_STOP] = float(re.sub(',', '', m.group(3)))
+                stock_details[STOCK_ORDER_QUANTITY] = float(m.group(2))
+                stocks_dict[m.group(1)] = stock_details
+                # for reconciliation
+                stock_handle.append(m.group(1))
         if len(stock_counter) != len(stock_handle):
             print(f'Error ***\n{stock_counter=}\n{stock_handle=}\n*** not equal when parsing existing orders')
             sys.exit(1)
@@ -188,9 +188,9 @@ def calc_95stop_quote(stocks_dict: dict) -> dict:
     :return: dict with calculated stop quote price
     """
     for stock, stock_details in stocks_dict.items():
-        last_price = float(stock_details[STOCK_LAST_PRICE])
+        last_price = stock_details[STOCK_LAST_PRICE]
         stop_quote_price = round((last_price * PERCENT_FOR_STOP_QUOTE), 2)
-        stocks_dict[stock][STOCK_95STOP_QUOTE] = (str(stop_quote_price))
+        stocks_dict[stock][STOCK_95STOP_QUOTE] = stop_quote_price
 
     return stocks_dict
 
@@ -207,14 +207,16 @@ def calc_avg_quote(stocks_dict: dict) -> dict:
     verbose_print(f'Calculating stop quotes.')
 
     for stock, stock_details in stocks_dict.items():
-        if float(stock_details[STOCK_GAIN]) >= 5 or \
-                float(stock_details[STOCK_GAIN]) <= -5 or \
+        if stock_details[STOCK_GAIN] >= 5 or \
+                stock_details[STOCK_GAIN] <= -5 or \
                 stock_details[STOCK_EXIST_STOP] != '':
             # calculate only if gain +/-5% or already existing stop quote
-            stock_95stop_quote = float(stock_details[STOCK_95STOP_QUOTE])
+            stock_95stop_quote = stock_details[STOCK_95STOP_QUOTE]
             if stock_details[STOCK_EXIST_STOP] != '':
-                exist_stop = float(stock_details[STOCK_EXIST_STOP])
+                exist_stop = stock_details[STOCK_EXIST_STOP]
                 avg_stop_quote = round(((stock_95stop_quote + exist_stop) / 2), 2)
+                # no decimal for stock price higher than 1000
+                # one decimal for stock price higher than 50
                 if avg_stop_quote >= 1000:
                     avg_stop_quote = int(avg_stop_quote)
                 elif avg_stop_quote >= 50:
@@ -222,7 +224,7 @@ def calc_avg_quote(stocks_dict: dict) -> dict:
             else:
                 # no existing stop quotes, then round 95% for stop quote
                 avg_stop_quote = int(stock_95stop_quote)
-            stocks_dict[stock][STOCK_NEW_STOP] = (str(avg_stop_quote))
+            stocks_dict[stock][STOCK_NEW_STOP] = avg_stop_quote
         else:
             verbose_print(f'No calculation for stock {stock} with gain {stock_details[STOCK_GAIN]}% and existing stop '
                           f'quote of {stock_details[STOCK_EXIST_STOP]}$')
@@ -266,12 +268,13 @@ def print_results(stocks_dict: dict, output_indicator: str):
             comments = ''
             try:
                 if float(stock_details[STOCK_EXIST_STOP]) > float(stock_details[STOCK_NEW_STOP]):
-                    comments = 'New stop quote is lower than the existing!'
+                    comments = 'New stop quote is lower than the existing! '
+                if stock_details[STOCK_HOLDING_QUANTITY] != stock_details[STOCK_ORDER_QUANTITY]:
+                    comments += 'Holding quantity is different than Order quantity! '
             except ValueError:
                 # when stock exist stop not exist
                 pass
-            f.write(stock + ',' + stock_details[STOCK_GAIN] + ',' + stock_details[STOCK_LAST_PRICE] + ',' +
-                    stock_details[STOCK_EXIST_STOP] + ',' + stock_details[STOCK_NEW_STOP] + ',' + comments + '\n')
+            f.write(f'{stock},{stock_details[STOCK_GAIN]},{stock_details[STOCK_LAST_PRICE]},{stock_details[STOCK_EXIST_STOP]},{stock_details[STOCK_NEW_STOP]},{comments}\n')
 
 
 def main():
