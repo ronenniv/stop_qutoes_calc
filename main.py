@@ -81,7 +81,7 @@ def get_input_file_argparse() -> dict:
         files_dict[VERBOSE_FLAG] = args.verbose[0]
     else:
         files_dict[VERBOSE_FLAG] = args.verbose
-    global verbose_flag_indicator
+    global verbose_flag_indicator  # pylint: disable=C0103
     verbose_flag_indicator = files_dict[VERBOSE_FLAG]
     verbose_print('Verbose is ON')
 
