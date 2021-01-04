@@ -27,7 +27,7 @@ PERCENT_FOR_STOP_QUOTE = 0.95
 STOCK_HOLDING_QUANTITY = 'HOLDING_QUANTITY'
 STOCK_ORDER_QUANTITY = 'ORDER_QUANTITY'
 
-verbose_flag_indicator = VERBOSE_ARG_OFF  # default is verbose off
+verbose_flag_indicator = VERBOSE_ARG_OFF  # pylint: disable=C0103
 
 
 def verbose_print(text: str):
