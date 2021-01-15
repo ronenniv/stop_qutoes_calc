@@ -30,7 +30,7 @@ jobs:
     - name: Test with test csv files under test_files
       run: |
         chmod 755 stocks_orders.sh
-        ./stocks_orders.sh -c test_files/ExportDataHoldings.csv -o test_files/ExportDataOrders.csv
+        ./stocks_orders.sh -c test_files/ExportDataHolding.csv -o test_files/ExportDataOrders.csv
         if [ $result -eq 0 ]
         then
           exit 1
