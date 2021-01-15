@@ -143,7 +143,7 @@ def extract_stocks(input_file_name: str) -> dict:
         # group(3) = Quantity
         # group(4) = Price
         r_unit_cost = re.compile(r'"([A-Z]{1,4})\s?!?"..'  # Symbol
-                                 r'"[+-]?\$\d+\.[0-9]{2,4} [+-]?\d+\.[0-9]{2,4}%"..'  # Day price 
+                                 r'"[+-]?\$\d+\.[0-9]{2,4} [+-]?\d+\.[0-9]{2,4}%"..'  # Day price
                                  r'"[+-]?\$[0-9,]+\.?\d* ([+-]?\d+\.?\d*)%"..'  # Unrealized gain
                                  r'"[A-Z].*"..'  # Description
                                  r'"(\d*.?\d*)"..'  # Quantity
