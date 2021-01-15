@@ -1,7 +1,4 @@
-# This workflow will install Python dependencies, run tests and lint with a single version of Python
-# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
-
-name: Python application
+name: Run test with test csv files
 
 on:
   push:
@@ -33,4 +30,8 @@ jobs:
     - name: Test with test csv files under test_files
       run: |
         chmod 755 stocks_orders.sh
-        ./stocks_orders.sh -c test_files/ExportDataHolding.csv -o test_files/ExportDataOrders.csv
+        ./stocks_orders.sh -c test_files/ExportDataHoldings.csv -o test_files/ExportDataOrders.csv
+        if [ $result -eq 0 ]
+        then
+          exit 1
+        fi
