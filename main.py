@@ -26,6 +26,7 @@ STOCK_NEW_STOP = 'NEW_STOP$'
 PERCENT_FOR_STOP_QUOTE = 0.95
 STOCK_HOLDING_QUANTITY = 'HOLDING_QUANTITY'
 STOCK_ORDER_QUANTITY = 'ORDER_QUANTITY'
+GAIN_RATE = 5  # from which gain to calculate the stop quotes
 
 
 class Verbose:
@@ -141,11 +142,14 @@ def extract_stocks(input_file_name: str) -> dict:
         # group(2) = Unrealized gain
         # group(3) = Quantity
         # group(4) = Price
-        r_unit_cost = re.compile(r'"([A-Z]{1,4})\s?!?".."[+-]?\$\d+\.?\d\d [+-]?\d+\.?\d\d%".."'
-                                 r'[+-]?\$[0-9,]+\.?\d* ([+-]?\d+\.?\d*)%".."[A-Z].*".."(\d*.?\d*)"'
-                                 r'.."\$[0-9,]+\.?\d*".."\$([0-9,]+\.?\d*)"')
+        r_unit_cost = re.compile(r'"([A-Z]{1,4})\s?!?"..'  # Symbol
+                                 r'"[+-]?\$\d+\.[0-9]{2,4} [+-]?\d+\.[0-9]{2,4}%"..'  # Day price 
+                                 r'"[+-]?\$[0-9,]+\.?\d* ([+-]?\d+\.?\d*)%"..'  # Unrealized gain
+                                 r'"[A-Z].*"..'  # Description
+                                 r'"(\d*.?\d*)"..'  # Quantity
+                                 r'"\$[0-9,]+\.?\d*"..'  # Unit cost
+                                 r'"\$([0-9,]+\.?\d*)"')  # Price
         r_stock = re.compile(r'"([A-Z]{1,4})\s?!?"')
-
         lines = file_output_stream.readlines()
         stocks_dict = {}
         stock_counter = []  # use for reconciliation
@@ -169,6 +173,8 @@ def extract_stocks(input_file_name: str) -> dict:
                   f'*** not equal when parsing holdings')
             print(f'Difference is {set(stock_counter).difference(set(stocks_dict.keys()))}')
             sys.exit(1)
+        else:
+            print(f'Found {len(stocks_dict)} stocks in holding files')
 
         return stocks_dict
 
@@ -186,9 +192,14 @@ def extract_orders(input_file_name: str, stocks_dict: dict):
         # m.group(1) = symbol
         # m.group(2) = quantity
         # m.group(3) = stop quote
-        r_order = re.compile(r'.*"\s?([A-Z]{1,4})\s?!?".*"(\d*.?\d*)"..'
-                             r'"Stop quote\$([0-9,]+\.?[0-9]{2})')
-        r_stock = re.compile(r'.*"\s?([A-Z]{1,4})\s?!?"')
+        r_order = re.compile(r'.*"\s?'  # any text in the begining of the line
+                             r'([A-Z]{1,4})\s?!?".*'  # Symbol
+                             r'"(\d*.?\d*)"..'  # Quantity
+                             r'"Stop quote'  # Order Type - only Stop quote
+                             r'\$([0-9,]+\.?[0-9]{2})')  # Stop quantity price
+        r_stock = re.compile(r'.*"\s?'  # any text in the begining of the line
+                             r'([A-Z]{1,4})\s?!?".*'  # Symbol
+                             r'"Stop quote\$')  # Order Type - only Stop quote
 
         lines = file_output_stream.readlines()
 
@@ -240,8 +251,8 @@ def calc_avg_quote(stocks_dict: dict) -> dict:
     Verbose.print('Calculating stop quotes.')
 
     for stock, stock_details in stocks_dict.items():
-        if stock_details[STOCK_GAIN] >= 5 or \
-                stock_details[STOCK_GAIN] <= -5 or \
+        if stock_details[STOCK_GAIN] >= GAIN_RATE or \
+                stock_details[STOCK_GAIN] <= -GAIN_RATE or \
                 stock_details[STOCK_EXIST_STOP] != '':
             # calculate only if gain +/-5% or already existing stop quote
             stock_95stop_quote = stock_details[STOCK_95STOP_QUOTE]
@@ -318,7 +329,7 @@ def print_results(stocks_dict: dict, output_indicator: str):
                 # consider it when comparing holding and order quantity
                 if int(stock_details[STOCK_HOLDING_QUANTITY]) != \
                         stock_details[STOCK_ORDER_QUANTITY]:
-                    comments += 'Holding quantity is different than Order quantity! '
+                    comments += 'Quantities are different! '
             file_output_stream.write(f'{stock},'
                                      f'{stock_details[STOCK_GAIN]},'
                                      f'{stock_details[STOCK_LAST_PRICE]},'
