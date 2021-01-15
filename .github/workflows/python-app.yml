@@ -31,4 +31,4 @@ jobs:
       run: |
         chmod 755 stocks_orders.sh
         ./stocks_orders.sh -c test_files/ExportDataHolding.csv -o test_files/ExportDataOrders.csv
-        exit 1
+        exit $?
