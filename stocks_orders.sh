@@ -26,6 +26,8 @@ result=$?
 if [ $result -eq 0 ]
 then
   echo "Completed successfully!!!"
+  exit 0
 else
   echo "Completed with errors!!!"
+  exit 1
 fi
