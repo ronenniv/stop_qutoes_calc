@@ -309,7 +309,7 @@ def print_results(stocks_dict: dict, output_indicator: str):
     """
     if output_indicator == OUTPUT_ARG_YES:
         output_file_name = datetime.now().strftime('%m%d%Y_%H%M%S') + '.summary.csv'
-        output_file_name = os.path.join(os.path.expanduser('~/Downloads'), output_file_name)
+        output_file_name = os.path.join(os.path.expanduser('~'), 'Downloads', output_file_name)
     else:
         output_file_name = None
     Verbose.print(f'Writing output to {output_file_name}')
@@ -322,11 +322,11 @@ def print_results(stocks_dict: dict, output_indicator: str):
                 if float(stock_details[STOCK_EXIST_STOP]) > float(stock_details[STOCK_NEW_STOP]):
                     comments = 'New stop quote is lower than the existing! '
             except ValueError:
-                # when stock exist stop not exist
+                # when STOCK_EXIST_STOP value not exist
                 pass
             else:
-                # holding quantity can have fractions of a stock
-                # consider it when comparing holding and order quantity
+                # holding quantity can be fractions of a stock
+                # round it to int for comparing holding and order quantity
                 if int(stock_details[STOCK_HOLDING_QUANTITY]) != \
                         stock_details[STOCK_ORDER_QUANTITY]:
                     comments += 'Quantities are different! '
