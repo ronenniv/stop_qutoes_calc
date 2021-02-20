@@ -5,6 +5,7 @@ import argparse
 import os
 import re
 import sys
+from collections import OrderedDict
 from datetime import datetime
 
 # args constants
@@ -150,11 +151,10 @@ def extract_stocks(input_file_name: str) -> dict:
                                  r'"\$[0-9,]+\.?\d*"..'  # Unit cost
                                  r'"\$([0-9,]+\.?\d*)"')  # Price
         r_stock = re.compile(r'"([A-Z]{1,4})\s?!?"')
-        lines = file_output_stream.readlines()
         stocks_dict = {}
         stock_counter = []  # use for reconciliation
 
-        for line in lines:
+        for line in file_output_stream:
             # when stock is sold it places -- for unrealized gain and unit cost.
             # need to replace with zeros before regex handle it
             line = re.sub('-- --', '+$0.0 +0.0%', line)
@@ -200,12 +200,10 @@ def extract_orders(input_file_name: str, stocks_dict: dict):
         r_stock = re.compile(r'.*"\s?'  # any text in the begining of the line
                              r'([A-Z]{1,4})\s?!?".*'  # Symbol
                              r'"Stop quote\$')  # Order Type - only Stop quote
-
-        lines = file_output_stream.readlines()
-
         stock_counter = []  # for reconciliation
         stock_handle = []  # for reconciliation
-        for line in lines:
+
+        for line in file_output_stream:
             if m_stock := r_stock.match(line):
                 stock_counter.append(m_stock.group(1))
             if m_order := r_order.match(line):
@@ -313,10 +311,14 @@ def print_results(stocks_dict: dict, output_indicator: str):
     else:
         output_file_name = None
     Verbose.print(f'Writing output to {output_file_name}')
+
+    # order stocks before printing
+    stocks_dict_ordered = OrderedDict(sorted(stocks_dict.items()))
+
     with open(output_file_name, 'x') if output_file_name else sys.stdout as file_output_stream:
         file_output_stream.write('Symbol,Gain,Last Price,Existing Stop Quote,New Stop Quote,'
                                  'Comments\n')
-        for stock, stock_details in stocks_dict.items():
+        for stock, stock_details in stocks_dict_ordered.items():
             comments = ''
             try:
                 if float(stock_details[STOCK_EXIST_STOP]) > float(stock_details[STOCK_NEW_STOP]):
